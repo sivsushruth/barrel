@@ -2,8 +2,8 @@
 <img src="https://raw.githubusercontent.com/barrel-db/media/master/banner/barrel-banner-groupfb.png">
 
 <p align="center">
-   <a href="https://travis-ci.org/barrel-db/barrel-platform">
-        <img src="https://img.shields.io/travis/barrel-db/barrel-platform.svg?style=flat-square">
+   <a href="https://travis-ci.org/barrel-db/barrel">
+        <img src="https://img.shields.io/travis/barrel-db/barrel.svg?style=flat-square">
    </a>
    
    <a href="https://github.com/barrel-db/barrel-platform/blob/master/LICENSE">
