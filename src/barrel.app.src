@@ -1,0 +1,20 @@
+{application, barrel,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { barrel_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    lager,
+    os_mon,
+    gproc,
+    erocksdb
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]}.
