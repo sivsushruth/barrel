@@ -1,0 +1,27 @@
+FROM ubuntu:trusty
+MAINTAINER Benoit Chesneau <bchesneau@gmail.com>
+
+ENV KERL_CONFIGURE_OPTIONS="--disable-hipe --enable-smp-support \
+    --enable-threads --enable-kernel-poll --without-odbc \
+    --enable-dirty-schedulers"
+
+VOLUME /bindir
+
+RUN cd /tmp && \
+	apt-get -y update && \
+	sudo apt-get -y install build-essential autoconf libncurses5-dev openssl libssl-dev fop xsltproc unixodbc-dev git curl
+
+RUN cd /tmp && \
+	curl -O https://raw.githubusercontent.com/kerl/kerl/master/kerl && \
+	chmod +x kerl
+
+RUN mkdir -p $HOME/.kerl
+RUN mkdir -p $HOME/otp
+
+CMD cd /tmp && \
+	./kerl build git https://github.com/erlang/otp.git $OTP_RELEASE $OTP_RELEASE && \
+	./kerl install $OTP_RELEASE $HOME/otp/$OTP_VERSION && \
+	tar -C $HOME/otp -cjf /bindir/erlang-$OTP_VERSION-nonroot.tar.bz2 $OTP_VERSION
+
+
+

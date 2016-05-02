@@ -1,5 +1,5 @@
 [{<<"erocksdb">>,
-  {git,"https://gitlab.com/barrel-db/erocksdb.git",
+  {git,"https://github.com/barrel-db/erocksdb.git",
        {ref,"c8c7c76f8891c94b048598e939384769069ce681"}},
   0},
  {<<"goldrush">>,

@@ -1,17 +1,21 @@
 language: erlang
-otp_release:
-- 18.0
-- 18.1
-- 18.2
-- 18.3
 sudo: true
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-5
+env:
+  global:
+    - CXX=g++-5
 before_install:
 - sudo apt-get -y update
 - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
 - sudo apt-get -y install libtool automake autoconf autoconf-archive
 install:
 - "./support/bootstrap_travis.sh"
-script: DEBUG=1 ./rebar3 compile
+script: ./support/travis_run_tests.sh
 notifications:
   email:
   - bchesneau@gmail.com
