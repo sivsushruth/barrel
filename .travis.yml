@@ -12,7 +12,7 @@ env:
 before_install:
 - sudo apt-get -y update
 - sudo apt-get -y install libicu-dev libmozjs185-dev pkg-config help2man libcurl4-openssl-dev
-- sudo apt-get -y install libtool automake autoconf autoconf-archive
+- sudo apt-get -y install libtool automake autoconf autoconf-archive bzip2
 install:
 - "./support/bootstrap_travis.sh"
 script: ./support/travis_run_tests.sh
