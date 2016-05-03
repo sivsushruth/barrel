@@ -2,4 +2,4 @@
 
 source $HOME/otp/18.3.2/activate
 
-DEBUG=1 ./rebar3 eunit
+DEBUl=1 ./rebar3 eunit

@@ -1,5 +1,5 @@
-REBAR ?= rebar3
 BASE_DIR = $(shell pwd)
+REBAR ?= $(BASE_DIR)/rebar3
 ERLANG_RELEASE=OTP-18.3.2
 ERLANG_VERSION=18.3.2
 

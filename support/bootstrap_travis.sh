@@ -18,6 +18,4 @@ mkdir -p ~/otp && tar -xf erlang-18.3.2-nonroot.tar.bz2 -C ~/otp/
 mkdir -p ~/.kerl
 source $HOME/otp/18.3.2/activate
 
-wget https://s3.amazonaws.com/rebar3/rebar3
-chmod +x rebar3
 ./rebar3 update
