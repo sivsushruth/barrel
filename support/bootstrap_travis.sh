@@ -14,12 +14,8 @@ if [ "$TRAVIS_OTP_RELEASE" = "18.3" ]; then
 fi
 
 wget https://barrel-db.org/dl/erlang-18.3.2-nonroot.tar.bz2
-mkdir -p ~/otp && tar -xvf erlang-18.3.2-nonroot.tar.bz2 -C ~/otp/
-mkdir -p ~/.kerl
+mkdir -p $HOME/otp && tar -xf erlang-18.3.2-nonroot.tar.bz2 -C $HOME/otp/
+mkdir -p $HOME/.kerl
 source $HOME/otp/18.3.2/activate
-
-ERL_VSN=`erl -eval '{ok, Version} = file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])), erlang:display(erlang:binary_to_list(Version)), halt().' -noshell`
-echo "Installed version of Erlang: $ERL_VSN"
-
 
 ./rebar3 update
