@@ -20,146 +20,135 @@
          info/2,
          parent/2,
          history/2,
-		 fold_leafs/3,
+         fold_leafs/3,
          leaves/1,
-		 is_leaf/2,
-		 winning_revision/1,
-		 prune/2, prune/3]).
+         is_leaf/2,
+         winning_revision/1,
+         prune/2, prune/3]).
 
 -export([is_deleted/1]).
 
 -define(IMAX1, 16#ffffFFFFffffFFFF).
 
-
--record(rev_info, {seq,
-                   id,
-                   parent}).
-
 new() ->
-    #{}.
+  #{}.
 
 new(#{ id := Id } = RevInfo) ->
     #{ Id => RevInfo }.
 
 
 add(RevInfo, Tree) ->
-    #{id := Id, parent := Parent} = RevInfo,
+  #{id := Id, parent := Parent} = RevInfo,
 
-    case maps:is_key(Id, Tree) of
-        true -> error({badrev, already_exists});
-        false -> ok
-    end,
+  case maps:is_key(Id, Tree) of
+    true -> error({badrev, already_exists});
+    false -> ok
+  end,
 
-    case maps:is_key(Parent, Tree) of
-        true -> ok;
-        false when Parent =:= "" -> ok;
-        false -> error({badrev, missing_parent})
-    end,
+  case maps:is_key(Parent, Tree) of
+    true -> ok;
+    false when Parent =:= "" -> ok;
+    false -> error({badrev, missing_parent})
+  end,
 
-    Tree#{ Id => RevInfo }.
+  Tree#{ Id => RevInfo }.
 
 
 contains(RevId, Tree) ->
-    maps:is_key(RevId, Tree).
+  maps:is_key(RevId, Tree).
 
 
 info(RevId, Tree) ->
-    case maps:find(RevId, Tree) of
-        error -> {error, not_found};
-        {ok, RevInfo} -> {ok, RevInfo}
-    end.
+  case maps:find(RevId, Tree) of
+    error -> {error, not_found};
+    {ok, RevInfo} -> {ok, RevInfo}
+  end.
 
 
 parent(RevId, Tree) ->
-    case maps:find(RevId, Tree) of
-        error -> "";
-        {ok, RevInfo} -> maps:get(parent, RevInfo, "")
-    end.
+  case maps:find(RevId, Tree) of
+    error -> "";
+    {ok, RevInfo} -> maps:get(parent, RevInfo, "")
+  end.
 
 history(RevId, Tree) ->
-    history1(maps:get(RevId, Tree, nil), Tree, []).
+  history1(maps:get(RevId, Tree, nil), Tree, []).
 
 history1(nil, _Tree, History) ->
-    lists:reverse(History);
+  lists:reverse(History);
 history1(#{id := Id, parent := Parent}, Tree, History) ->
-    history1(maps:get(Parent, Tree, nil), Tree, [Id | History]).
+  history1(maps:get(Parent, Tree, nil), Tree, [Id | History]).
 
 
 fold_leafs(Fun, AccIn, Tree) ->
-    Parents = maps:fold(fun
-                            (_Id, #{ parent := Parent }, Acc) when Parent /="" ->
-                                [Parent | Acc];
-                            (_Id, _RevInfo, Acc) ->
-                                Acc
-                        end, [], Tree),
+  Parents = maps:fold(fun
+                        (_Id, #{ parent := Parent }, Acc) when Parent /="" ->
+                          [Parent | Acc];
+                        (_Id, _RevInfo, Acc) ->
+                          Acc
+                      end, [], Tree),
 
-
-    maps:fold(fun(RevId, RevInfo, Acc) ->
-                      case lists:member(RevId, Parents) of
-                          true -> Acc;
-                          false -> Fun(RevInfo, Acc)
-                      end
-              end, AccIn, Tree).
-
+  maps:fold(fun(_RevId, RevInfo, Acc) ->
+                Fun(RevInfo, Acc)
+            end, AccIn, maps:without(Parents, Tree)).
 
 leaves(Tree) ->
-    fold_leafs(fun(#{id := RevId}, Acc) ->
-                       [ RevId | Acc ]
-               end, [], Tree).
+  fold_leafs(fun(#{id := RevId}, Acc) ->
+                 [ RevId | Acc ]
+             end, [], Tree).
 
 is_leaf(RevId, Tree) ->
-    case maps:is_key(RevId, Tree) of
-        true ->
-            try
-                maps:fold(fun
-                              (_, #{parent := Parent}, _) when Parent =:= RevId ->
-                                  throw(has_parent);
-                              (_, _, Acc) ->
-                                  Acc
-                          end, true, Tree)
-            catch
-                has_parent -> false
-            end;
-        false ->
-            false
-    end.
+  case maps:is_key(RevId, Tree) of
+    true ->
+      try
+        maps:fold(fun
+                    (_, #{parent := Parent}, _) when Parent =:= RevId ->
+                      throw(has_parent);
+                    (_, _, Acc) ->
+                      Acc
+                  end, true, Tree)
+      catch
+        has_parent -> false
+      end;
+    false ->
+      false
+  end.
 
 
 is_deleted(#{deleted := Del}) -> Del;
 is_deleted(_) -> false.
 
 winning_revision(Tree) ->
-    {Winner, _WinnerExists, LeafCount, ActiveLeafCount} =
-    fold_leafs(fun(#{id := Id} = RevInfo, {W, WE, LC, ALC}) ->
-                       Deleted = is_deleted(RevInfo),
-                       Exists = Deleted =:= false,
-                       LC2 = LC + 1,
-                       ALC2 = case Exists of
-                                  true ->
-                                      ALC + 1;
-                                  false ->
-                                      ALC
-                              end,
+  {Winner, _WinnerExists, LeafCount, ActiveLeafCount} =
+  fold_leafs(fun(#{id := Id} = RevInfo, {W, WE, LC, ALC}) ->
+                 Deleted = is_deleted(RevInfo),
+                 Exists = Deleted =:= false,
+                 LC2 = LC + 1,
+                 ALC2 = case Exists of
+                          true ->
+                            ALC + 1;
+                          false ->
+                            ALC
+                        end,
 
-                       {W2, WE2} = case {Exists, WE} of
-                                       {true, false} ->
-                                           {Id, Exists};
-                                       {WE, _} ->
-                                           case barrel_revision:compare(Id, W) of
-                                               R when R > 0 ->
-                                                   {Id, Exists};
-                                               _ ->
-                                                   {W, WE}
-                                           end;
-                                       _ ->
-                                           {W, WE}
-                                   end,
-
-                       {W2, WE2, LC2, ALC2}
-               end, {"", false, 0, 0}, Tree),
-    Branched = (LeafCount > 1),
-    Conflict = (ActiveLeafCount > 1),
-    {Winner, Branched, Conflict}.
+                 {W2, WE2} = case {Exists, WE} of
+                               {true, false} ->
+                                 {Id, Exists};
+                               {WE, _} ->
+                                 case barrel_revision:compare(Id, W) of
+                                   R when R > 0 ->
+                                     {Id, Exists};
+                                   _ ->
+                                     {W, WE}
+                                 end;
+                               _ ->
+                                 {W, WE}
+                             end,
+                 {W2, WE2, LC2, ALC2}
+             end, {"", false, 0, 0}, Tree),
+  Branched = (LeafCount > 1),
+  Conflict = (ActiveLeafCount > 1),
+  {Winner, Branched, Conflict}.
 
 
 prune(Depth, Tree) ->
@@ -173,45 +162,45 @@ prune(Depth, KeepRev, Tree) ->
     end.
 
 do_prune(Depth, KeepRev, Tree) ->
-    {MinPos0, MaxDeletedPos} = fold_leafs(fun(#{id := RevId}=RevInfo, {MP, MDP}) ->
-                                                  Deleted = is_deleted(RevInfo),
-                                                  {Pos, _} = barrel_revision:parse(RevId),
-                                                  case Deleted of
-                                                      true when Pos > MDP ->
-                                                          {MP, Pos};
-                                                      _ when Pos > 0, Pos < MP ->
-                                                          {Pos, MDP};
-                                                      _ ->
-                                                          {MP, MDP}
-                                                  end
-                                          end, {?IMAX1, 0}, Tree),
-    MinPos = if
-                 MinPos0 =:= ?IMAX1 -> MaxDeletedPos;
-                 true -> MinPos0
-             end,
-    MinPosToKeep0 = MinPos - Depth + 1,
-    {PosToKeep, _} = barrel_revision:parse(KeepRev),
-    MinPosToKeep = if
-                       PosToKeep > 0,  PosToKeep < MinPosToKeep0 -> PosToKeep;
-                       true -> MinPosToKeep0
-                   end,
-    if
-        MinPosToKeep > 1 ->
-            maps:fold(fun(RevId, RevInfo, {N, NewTree}) ->
-                              {Pos, _} = barrel_revision:parse(RevId),
-                              if
-                                  Pos < MinPosToKeep ->
-                                      {N + 1, maps:remove(RevId, NewTree)};
-                                  Pos =:= MinPosToKeep ->
-                                      RevInfo2 = RevInfo#{parent => ""},
-                                      {N, NewTree#{RevId => RevInfo2}};
-                                  true ->
-                                      {N, NewTree}
-                              end
-                        end, {0, Tree}, Tree);
-        true ->
-            {0, Tree}
-    end.
+  {MinPos0, MaxDeletedPos} = fold_leafs(fun(#{id := RevId}=RevInfo, {MP, MDP}) ->
+                                            Deleted = is_deleted(RevInfo),
+                                            {Pos, _} = barrel_revision:parse(RevId),
+                                            case Deleted of
+                                              true when Pos > MDP ->
+                                                {MP, Pos};
+                                              _ when Pos > 0, Pos < MP ->
+                                                {Pos, MDP};
+                                              _ ->
+                                                {MP, MDP}
+                                            end
+                                        end, {?IMAX1, 0}, Tree),
+  MinPos = if
+             MinPos0 =:= ?IMAX1 -> MaxDeletedPos;
+             true -> MinPos0
+           end,
+  MinPosToKeep0 = MinPos - Depth + 1,
+  {PosToKeep, _} = barrel_revision:parse(KeepRev),
+  MinPosToKeep = if
+                   PosToKeep > 0,  PosToKeep < MinPosToKeep0 -> PosToKeep;
+                   true -> MinPosToKeep0
+                 end,
+  if
+    MinPosToKeep > 1 ->
+      maps:fold(fun(RevId, RevInfo, {N, NewTree}) ->
+                    {Pos, _} = barrel_revision:parse(RevId),
+                    if
+                      Pos < MinPosToKeep ->
+                        {N + 1, maps:remove(RevId, NewTree)};
+                      Pos =:= MinPosToKeep ->
+                        RevInfo2 = RevInfo#{parent => ""},
+                        {N, NewTree#{RevId => RevInfo2}};
+                      true ->
+                        {N, NewTree}
+                    end
+                end, {0, Tree}, Tree);
+    true ->
+      {0, Tree}
+  end.
 
 
 -ifdef(TEST).
