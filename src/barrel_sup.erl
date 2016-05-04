@@ -46,7 +46,11 @@ init([]) ->
            {barrel_store, start_link, []},
            permanent, brutal_kill, worker, [barrel_store]},
 
-  {ok, { {one_for_all, 0, 3600}, [Store]}}.
+  Dbs = {barrel_dbs_sup,
+         {barrel_dbs_sup, start_link, []},
+         permanent, infinity, supervisor, [barrel_dbs_sup]},
+
+  {ok, { {one_for_all, 0, 3600}, [Store, Dbs]}}.
 
 %%====================================================================
 %% Internal functions
