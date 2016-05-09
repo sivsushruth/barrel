@@ -92,8 +92,7 @@ load_config(Resource, Config) when is_atom(Resource), is_list(Config) ->
                                                                Config],
   Forms = lists:flatten([Module, Exported, Functions]),
   merl:compile_and_load(Forms, [verbose]),
-
-              ok.
+  ok.
 
 make_function(K, V) ->
     Cs = [?Q("() -> _@V@")],
