@@ -7,8 +7,9 @@
    [kernel,
     stdlib,
     lager,
-    os_mon,
+    uuid,
     gproc,
+    sext,
     erocksdb
    ]},
   {env,[]},

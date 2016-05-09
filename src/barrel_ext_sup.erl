@@ -13,28 +13,51 @@
 %% limitations under the Licence.
 
 %%%-------------------------------------------------------------------
-%% @doc barrel top level supervisor.
+%% @doc barrel supervisor for store backends & plugins
 %% @end
 %%%-------------------------------------------------------------------
 
--module(barrel_sup).
+-module(barrel_ext_sup).
 
 -behaviour(supervisor).
 
 %% API
 -export([start_link/0]).
+-export([start_proc/4, start_proc/5]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
--define(SERVER, ?MODULE).
+-define(SHUTDOWN, 120000).
+
 
 %%====================================================================
 %% API functions
 %%====================================================================
 
 start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+  supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+
+start_proc(Name, M, F, A) ->
+  start_proc(Name, M, F, A, []).
+
+start_proc(Name, M, F, A, Opts) ->
+  DefaultSpec = #{ id => Name,
+                   start => {M, F, A},
+                   restart => transient,
+                   shutdown => ?SHUTDOWN,
+                   type => worker,
+                   modules => [M] },
+
+  Spec = merge_opts(Opts, DefaultSpec),
+  case supervisor:start_child(?MODULE, Spec) of
+    {error, already_present} ->
+      supervisor:restart_child(?MODULE, Name);
+    Other ->
+      Other
+  end.
+
 
 %%====================================================================
 %% Supervisor callbacks
@@ -42,27 +65,21 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-  SupFlags = {one_for_all, 0, 3600},
+  {ok, {{one_for_one, 4, 3600}, []}}.
 
-  _ = init_tabs(),
-
- Manager = {barrel_manager,
-            {barrel_manager, start_link, []},
-            permanent, 5000, worker, [barrel_manager]},
-
-  %% safe supervisor, like kernel_safe_sup but for barrel, allows to register
-  %% external applications to it like stores if needed.
- ExtSup = {barrel_ext_sup,
-           {barrel_ext_sup, start_link, []},
-           permanent, infinity, supervisor, [barrel_ext_sup]},
-
-
-  {ok, { SupFlags, [Manager, ExtSup]}}.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
-%%
-init_tabs() ->
-  _ = ets:new(barrel_gvar, [set, named_table, public]),
-  ok.
+
+-spec merge_opts([{atom(), any()}], map()) -> map().
+merge_opts([{restart, V} | Rest], Spec) ->
+  merge_opts(Rest, Spec#{restart => V});
+merge_opts([{shutdown, V} | Rest], Spec) ->
+  merge_opts(Rest, Spec#{shutdown => V});
+merge_opts([{type, V} | Rest], Spec) ->
+  merge_opts(Rest, Spec#{type => V});
+merge_opts([{modules, V} | Rest], Spec) ->
+  merge_opts(Rest, Spec#{modules => V});
+merge_opts([_| Rest], Spec) ->
+  merge_opts(Rest, Spec).
