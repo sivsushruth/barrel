@@ -62,7 +62,7 @@
 -spec all_databases() -> [barrel:dbname()].
 all_databases() ->
   Fun = fun(DbName, Acc) -> [DbName | Acc] end,
-  lists:reverse(all_databases(Fun, [])).
+  lists:sort(all_databases(Fun, [])).
 
 
 -spec all_databases(barrel:all_databases_fun(), any()) -> any().
