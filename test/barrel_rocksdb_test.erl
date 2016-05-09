@@ -62,7 +62,7 @@ database_test() ->
 
   ?assertEqual([{"testdb", rocksdb_disc},
                 {"testdb1", rocksdb_disc},
-                {"testdb2", rocksdb_ram}], lists:reverse(All)),
+                {"testdb2", rocksdb_ram}], lists:ukeysort(1, All)),
 
 
   barrel:close_database(Db),
