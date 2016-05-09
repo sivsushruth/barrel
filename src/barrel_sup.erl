@@ -1,4 +1,4 @@
-%% Copyright 2016 Enki Multimedia
+%% Copyright 2016 Benoit Chesneau
 %%
 %% Licensed under the EUPL, Version 1.1 only (the "Licence");
 %% You may not use this work except in compliance with the Licence.
