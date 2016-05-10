@@ -189,7 +189,7 @@ init_tabs() ->
 
   case ets:info(?CLIENTS, name) of
     undefined ->
-      ets:new(?CLIENTS, [set, named_table, public]),
+      ets:new(?CLIENTS, [ordered_set, named_table, public]),
       false;
     _ ->
       true
@@ -218,6 +218,9 @@ handle_cast(_Msg, State) ->
 
 handle_info({pending_reply, {Ref, Result}}, State) ->
   handle_pending_reply({Ref, Result}, State);
+handle_info({'DOWN', _, _, Pid, _}, State) ->
+  process_is_down(Pid),
+  {noreply, State};
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -348,6 +351,7 @@ internal_create_database(Alias, DbName, Options, FromPid) ->
     {ok, Mod} ->
       case Mod:create_database(Alias, DbName, Options) of
         {ok, DbRef} ->
+
           store_options(Alias, DbName, Options),
           Db = #{ backend => Mod,
                   alias => Alias,
@@ -356,6 +360,7 @@ internal_create_database(Alias, DbName, Options, FromPid) ->
 
           ets:insert(?DBS, {DbName, Db, 1}),
           ets:insert(?OWNERS, {DbName, FromPid}),
+          ets:insert(?CLIENTS, {{FromPid, DbName}, Db}),
           monitor_client(FromPid),
 
           {ok, Db};
@@ -375,8 +380,9 @@ do_open_database(DbName, FromPid) ->
             {ok, Db}
         end,
   case Res of
-    {ok, _Db} ->
+    {ok, DbObj} ->
       ets:insert(?OWNERS, {DbName, FromPid}),
+      ets:insert(?CLIENTS, {{FromPid, DbName}, DbObj}),
       monitor_client(FromPid),
       Res;
     Error ->
@@ -408,8 +414,10 @@ internal_open(DbName) ->
 
 
 do_close_database(Db, FromPid) ->
-  #{ backend := Mod, db := DbRef, name := DbName } = Db,
-  ets:delete(?OWNERS, {DbName, FromPid}),
+
+  #{ backend := Mod, db := DbRef, name := DbName} = Db,
+  ets:delete_object(?OWNERS, {DbName, FromPid}),
+  ets:delete(?CLIENTS, {FromPid, DbName}),
   case ets:lookup(?DBS, DbName) of
     [] -> ok;
     [_] ->
@@ -456,3 +464,13 @@ init_monitors(false) ->
   ok;
 init_monitors(true) ->
   [erlang:monitor(process, Pid) || [Pid] <- ets:match(?CLIENTS, {'$1', m})].
+
+process_is_down(Pid) ->
+  case ets:lookup(Pid) of
+    [] -> ok;
+    [_] ->
+      Dbs = [Db || [Db] <- ets:match(?CLIENTS, {{Pid, '$_'}, '$1'})],
+      lists:foreach(fun(Db) ->
+                        do_close_database(Db, Pid)
+                    end, Dbs)
+  end.
