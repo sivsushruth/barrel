@@ -29,13 +29,13 @@ setup() ->
 
 simple_database_test() ->
   setup(),
-  {ok, Db} = barrel:create_database(rocksdb_disc, "testdb", []),
+  {ok, Db} = barrel_manager:create_database(rocksdb_disc, testdb, []),
   ?assert(filelib:is_dir(filename:join([test_dir(), "testdb"]))),
-  ?assertEqual(["testdb"], barrel:all_databases()),
-  ?assertEqual(ok, barrel:close_database(Db)),
-  ?assertEqual(["testdb"], barrel:all_databases()),
-  ?assertEqual([], ets:lookup(barrel_dbs_owners, "testdb")),
-  ?assertEqual(ok, barrel:delete_database("testdb")),
+  ?assertEqual([testdb], barrel:all_databases()),
+  ?assert(is_pid(whereis(testdb))),
+  ?assertEqual({barrel_rocksdb, rocksdb_disc}, barrel_lib:get_db(testdb)),
+  ?assertEqual(ok, barrel_manager:delete_database(testdb)),
+  ?assertEqual(undefined, whereis(testdb)),
   ?assertEqual(false, filelib:is_dir(filename:join([test_dir(), "testdb"]))),
   ?assertEqual([], barrel:all_databases()),
   ok.
@@ -43,14 +43,14 @@ simple_database_test() ->
 
 database_test() ->
   setup(),
-  {ok, Db} = barrel:create_database(rocksdb_disc, "testdb", []),
+  {ok, Db} = barrel_manager:create_database(rocksdb_disc, testdb, []),
   ?assert(filelib:is_dir(filename:join([test_dir(), "testdb"]))),
-  ?assertEqual(["testdb"], barrel:all_databases()),
-  {ok, Db1} = barrel:create_database(rocksdb_disc, "testdb1", []),
+  ?assertEqual([testdb], barrel:all_databases()),
+  {ok, Db1} = barrel_manager:create_database(rocksdb_disc, testdb1, []),
   ?assert(filelib:is_dir(filename:join([test_dir(), "testdb1"]))),
-  {ok, Db2} = barrel:create_database(rocksdb_ram, "testdb2", []),
+  {ok, Db2} = barrel_manager:create_database(rocksdb_ram, testdb2, []),
   ?assertEqual(true, filelib:is_dir(filename:join([test_dir(), "testdb2"]))),
-  ?assertEqual(["testdb", "testdb1", "testdb2"], barrel:all_databases()),
+  ?assertEqual([testdb, testdb1, testdb2], barrel:all_databases()),
 
   Fun = fun(DbName, Acc) ->
             {ok, Alias, _Options} = barrel_manager:load_latest_options(DbName),
@@ -59,35 +59,13 @@ database_test() ->
 
   All = barrel:all_databases(Fun, []),
 
-  ?assertEqual([{"testdb", rocksdb_disc},
-                {"testdb1", rocksdb_disc},
-                {"testdb2", rocksdb_ram}], lists:keysort(1, All)),
+  ?assertEqual([{testdb, rocksdb_disc},
+                {testdb1, rocksdb_disc},
+                {testdb2, rocksdb_ram}], lists:keysort(1, All)),
 
 
-  barrel:close_database(Db),
-  barrel:close_database(Db1),
-  barrel:close_database(Db2),
+  barrel_manager:delete_database(Db),
+  barrel_manager:delete_database(Db1),
+  barrel_manager:delete_database(Db2),
 
-  ok.
-
-client_down_test() ->
-  setup(),
-  DbName = "testdb",
-  Parent = self(),
-  Pid = spawn(fun() ->
-                  {ok, Db} = barrel:create_database(rocksdb_disc, "testdb", []),
-                  Parent ! ack,
-                  receive
-                    ok -> ok
-                  end
-              end),
-
-  receive
-    ack -> ok
-  end,
-
-  ?assertEqual([{DbName, Pid}], ets:lookup(barrel_dbs_owners, DbName)),
-  Pid ! ok,
-  timer:sleep(100),
-  ?assertEqual([], ets:lookup(barrel_dbs_owners, [DbName])),
   ok.

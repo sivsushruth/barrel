@@ -18,6 +18,10 @@
 -export([set/2]).
 -export([unset/1]).
 
+-export([get_db/1]).
+-export([set_db/3]).
+-export([delete_db/1]).
+
 -export([data_dir/0]).
 -export([load_config/2]).
 
@@ -40,6 +44,16 @@ set(Key, Val) ->
 
 unset(Key) ->
   ets:delete(barrel_gvar, Key).
+
+get_db(DbName) ->
+  val(DbName).
+
+set_db(DbName, Mod, Alias) ->
+  set(DbName, {Mod, Alias}).
+
+delete_db(DbName) ->
+  unset(DbName).
+
 
 -spec data_dir() -> string().
 data_dir() ->

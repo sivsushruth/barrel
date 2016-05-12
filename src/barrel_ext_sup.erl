@@ -24,6 +24,7 @@
 %% API
 -export([start_link/0]).
 -export([start_proc/4, start_proc/5]).
+-export([stop_proc/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -38,26 +39,27 @@
 start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 start_proc(Name, M, F, A) ->
-  start_proc(Name, M, F, A, []).
+    start_proc(Name, M, F, A, []).
 
 start_proc(Name, M, F, A, Opts) ->
-  DefaultSpec = #{ id => Name,
-                   start => {M, F, A},
-                   restart => transient,
-                   shutdown => ?SHUTDOWN,
-                   type => worker,
-                   modules => [M] },
+    [Restart, Shutdown, Type, Modules] =
+	[proplists:get_value(K, Opts, Default)
+	 || {K, Default} <- [{restart, transient},
+			     {shutdown, ?SHUTDOWN},
+			     {type, worker},
+			     {modules, [M]}]],
+    case supervisor:start_child(
+	   ?MODULE, {Name, {M,F,A}, Restart, Shutdown, Type, Modules}) of
+	{error, already_present} ->
+	    supervisor:restart_child(?MODULE, Name);
+	Other ->
+	    Other
+    end.
 
-  Spec = merge_opts(Opts, DefaultSpec),
-  case supervisor:start_child(?MODULE, Spec) of
-    {error, already_present} ->
-      supervisor:restart_child(?MODULE, Name);
-    Other ->
-      Other
-  end.
 
+stop_proc(Name) ->
+  supervisor:terminate_child(?MODULE, Name).
 
 %%====================================================================
 %% Supervisor callbacks
@@ -66,20 +68,3 @@ start_proc(Name, M, F, A, Opts) ->
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
   {ok, {{one_for_one, 4, 3600}, []}}.
-
-
-%%====================================================================
-%% Internal functions
-%%====================================================================
-
--spec merge_opts([{atom(), any()}], map()) -> map().
-merge_opts([{restart, V} | Rest], Spec) ->
-  merge_opts(Rest, Spec#{restart => V});
-merge_opts([{shutdown, V} | Rest], Spec) ->
-  merge_opts(Rest, Spec#{shutdown => V});
-merge_opts([{type, V} | Rest], Spec) ->
-  merge_opts(Rest, Spec#{type => V});
-merge_opts([{modules, V} | Rest], Spec) ->
-  merge_opts(Rest, Spec#{modules => V});
-merge_opts([_| Rest], Spec) ->
-  merge_opts(Rest, Spec).
