@@ -34,6 +34,7 @@ simple_database_test() ->
   ?assertEqual([testdb], barrel:all_databases()),
   ?assert(is_pid(whereis(testdb))),
   ?assertEqual({barrel_rocksdb, rocksdb_disc}, barrel_lib:get_db(testdb)),
+  ?assertEqual({error, already_exists}, barrel_manager:create_database(rocksdb_disc, testdb, [])),
   ?assertEqual(ok, barrel_manager:delete_database(testdb)),
   ?assertEqual(undefined, whereis(testdb)),
   ?assertEqual(false, filelib:is_dir(filename:join([test_dir(), "testdb"]))),
