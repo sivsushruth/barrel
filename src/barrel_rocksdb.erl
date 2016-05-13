@@ -77,7 +77,7 @@ req(Db, Req, 0) ->
   req1(Db, Req);
 req(Db, Req, Retries) ->
   case req1(Db, Req) of
-    {error, noproc} ->
+    {error, {db_not_loaded, Db}} ->
       timer:sleep(100),
       req(Db, Req, Retries - 1);
     Reply ->
@@ -86,7 +86,7 @@ req(Db, Req, Retries) ->
 
 req1(Db, Req) ->
   case whereis(Db) of
-    undefined -> {error, db_not_loaded};
+    undefined -> {error, {db_not_loaded, Db}};
     Pid ->
       Ref = make_ref(),
       Pid ! {{self(), Ref}, Req},
