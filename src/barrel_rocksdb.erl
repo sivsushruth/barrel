@@ -51,7 +51,7 @@ backend_aliases() -> [rocksdb_ram, rocksdb_disc].
 
 create_database(Alias, Db, Options) when is_list(Options) ->
   open_database(Alias, Db, [{create_if_missing, true},
-                               {error_if_exists, true}|Options]);
+                            {error_if_exists, true}|Options]);
 create_database(_Alias, _Db, Config) ->
   erlang:error({badarg, Config}).
 
@@ -65,41 +65,41 @@ open_database(_Alias, _Db, _Options) ->
 
 delete_database(Db) ->
   %% we let the barrel manager delete the files
-	req(Db, delete_database).
+  req(Db, delete_database).
 
 
 %% If the db process crashes we want to give the supervisor
 %% a decent chance to restart it before failing our calls.
 req(Db, Req) ->
-	req(Db, Req, 99).
+  req(Db, Req, 99).
 
 req(Db, Req, 0) ->
-	req1(Db, Req);
+  req1(Db, Req);
 req(Db, Req, Retries) ->
-	case req1(Db, Req) of
-		{error, noproc} ->
-			timer:sleep(100),
-			req(Db, Req, Retries - 1);
-		Reply ->
-			Reply
-	end.
+  case req1(Db, Req) of
+    {error, noproc} ->
+      timer:sleep(100),
+      req(Db, Req, Retries - 1);
+    Reply ->
+      Reply
+  end.
 
 req1(Db, Req) ->
-	case whereis(Db) of
-		undefined -> {error, db_not_loaded};
-		Pid ->
-			Ref = make_ref(),
-			Pid ! {{self(), Ref}, Req},
-			rec(Db, Pid, Ref)
-	end.
+  case whereis(Db) of
+    undefined -> {error, db_not_loaded};
+    Pid ->
+      Ref = make_ref(),
+      Pid ! {{self(), Ref}, Req},
+      rec(Db, Pid, Ref)
+  end.
 
 rec(Db, Pid, Ref) ->
-	receive
-		{Db, Ref, Reply} ->
-			Reply;
-		{'EXIT', Pid, _} ->
-			{error, {db_not_loaded, Db}}
-	end.
+  receive
+    {Db, Ref, Reply} ->
+      Reply;
+    {'EXIT', Pid, _} ->
+      {error, {db_not_loaded, Db}}
+  end.
 
 
 start_link(Alias, Db, Options) ->
@@ -123,12 +123,12 @@ init_tab(Db) ->
 init(Parent, NewTab, Alias, Db, Options) ->
   register(Db, self()),
   DbRef = case init_db(NewTab, Alias, Db, Options) of
-    {ok, Ref} ->
-      proc_lib:init_ack(Parent, {ok, self()}),
-			Ref;
-    Error ->
-      exit(Error)
-  end,
+            {ok, Ref} ->
+              proc_lib:init_ack(Parent, {ok, self()}),
+              Ref;
+            Error ->
+              exit(Error)
+          end,
 
   loop(#{ sup => Parent,
           db => Db,
@@ -179,35 +179,35 @@ init_db(false, _Alias, Db, _Options) ->
   {ok, DbRef}.
 
 do_delete_database({Pid, Ref}, #{db := Db, ref := DbRef }) ->
-	catch erocksdb:close(DbRef),
-	Pid ! {Db, Ref, ok},
-	ets:delete(Db),
-	exit(shutdown).
+  catch erocksdb:close(DbRef),
+  Pid ! {Db, Ref, ok},
+  ets:delete(Db),
+  exit(shutdown).
 
 do_stop(#{ db := Db, ref := nil}) ->
-	ets:delete(Db),
-	exit(shutdown);
+  ets:delete(Db),
+  exit(shutdown);
 do_stop(#{ db := Db, ref := DbRef}) ->
-	erocksdb:close(DbRef),
-	ets:delete(Db),
-	exit(shutdown).
+  erocksdb:close(DbRef),
+  ets:delete(Db),
+  exit(shutdown).
 
 %%%%%%%%%%%%%%%%%
 %% system upgrade
 
 system_continue(_Parent, _Debug, State) ->
-	loop(State).
+  loop(State).
 
 -spec system_terminate(_, _, _, _) -> no_return().
 system_terminate(Reason, _Parent, _Debug, State) ->
-	case Reason of
-		normal -> do_stop(State);
-		shutdown -> do_stop(State);
-		{shutdown, _} -> do_stop(State);
-		_ -> exit(Reason)
-	end.
+  case Reason of
+    normal -> do_stop(State);
+    shutdown -> do_stop(State);
+    {shutdown, _} -> do_stop(State);
+    _ -> exit(Reason)
+  end.
 
 system_code_change(State, _Module, _OldVsn, _Extra) ->
-	{ok, State}.
+  {ok, State}.
 
 
