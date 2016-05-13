@@ -76,17 +76,17 @@ req(Db, Req) ->
 req(Db, Req, 0) ->
   req1(Db, Req);
 req(Db, Req, Retries) ->
-  case req1(Db, Req) of
-    {error, {db_not_loaded, Db}} ->
+  try
+    req1(Db, Req)
+  catch
+    exit:{db_not_loaded, _} ->
       timer:sleep(100),
-      req(Db, Req, Retries - 1);
-    Reply ->
-      Reply
+      req(Db, Req, Retries - 1)
   end.
 
 req1(Db, Req) ->
   case whereis(Db) of
-    undefined -> {error, {db_not_loaded, Db}};
+    undefined -> exit({db_not_loaded, Db});
     Pid ->
       Ref = make_ref(),
       Pid ! {{self(), Ref}, Req},
@@ -98,7 +98,7 @@ rec(Db, Pid, Ref) ->
     {Db, Ref, Reply} ->
       Reply;
     {'EXIT', Pid, _} ->
-      {error, {db_not_loaded, Db}}
+      exit({db_not_loaded, Db})
   end.
 
 
