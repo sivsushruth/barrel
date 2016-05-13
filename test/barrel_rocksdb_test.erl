@@ -30,10 +30,14 @@ setup() ->
 simple_database_test() ->
   setup(),
   {ok, Db} = barrel_manager:create_database(rocksdb_disc, testdb, []),
+  ?assertEqual({barrel_rocksdb, rocksdb_disc}, Db),
   ?assert(filelib:is_dir(filename:join([test_dir(), "testdb"]))),
   ?assertEqual([testdb], barrel:all_databases()),
   ?assert(is_pid(whereis(testdb))),
+  Pid = whereis(testdb),
   ?assertEqual({barrel_rocksdb, rocksdb_disc}, barrel_lib:get_db(testdb)),
+  ?assertEqual({ok, {barrel_rocksdb, rocksdb_disc}}, barrel_manager:open_database(testdb)),
+  ?assert(Pid =:= whereis(testdb)), %% make sure the pid is reused
   ?assertEqual({error, already_exists}, barrel_manager:create_database(rocksdb_disc, testdb, [])),
   ?assertEqual(ok, barrel_manager:delete_database(testdb)),
   ?assertEqual(undefined, whereis(testdb)),
