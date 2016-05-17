@@ -60,3 +60,4 @@ destroy(Name) ->
   %% depending on the platform.
   barrel_os_util:rm_rf(Name).
 
+

@@ -18,6 +18,18 @@
 -export([close/1]).
 -export([await/1]).
 
+-type backend() :: atom().
+-type db() :: atom() | string() | binary().
+
+-type open_options() :: [{backend, backend()} |
+                         {file, string() | binary()} |
+                         {db_opts, list()}].
+
+-export_types([backend/0, db/0, open_options/0]).
+
+
+%% @doc open a database
+-spec open(db(), open_options()) -> {ok, pid()} | {error, any()}.
 open(DbName, Options) ->
   Backend = proplists:get_value(backend, Options, barrel_rocksdb),
   _ = code:ensure_loaded(Backend),
@@ -33,11 +45,21 @@ open(DbName, Options) ->
       end
   end.
 
+%% @doc close a database
+-spec close(db()) -> ok.
 close(DbName) ->
   barrel_dbs_sup:stop_db(DbName).
 
+
+%% @equiv await(DbName, 60000)
+-spec await(db()) -> ok.
 await(DbName) ->
   barrel_db:await(DbName).
+
+%% @doc Waits for the barrel database `DbName' to become available.
+await(DbName, Timeout) ->
+  barrel_db:await(DbName, Timeout).
+
 
 
 -ifdef(TEST).
@@ -49,16 +71,10 @@ basic_test() ->
   {ok, Pid} = barrel:open(Db, [{backend, barrel_rocksdb}]),
   io:format("pid is ~p~n", [Pid]),
   ?assert(is_pid(Pid) =:= true),
-  {Pid, {Backend, Res}} = barrel:await(Db),
-  ?assertEqual(barrel_rocksdb, Backend),
+  ?assertEqual(ok, barrel:await(Db)),
   ?assert(filelib:is_dir("testdb") =:= true),
   ok = barrel:close(Db),
   barrel_os_util:rm_rf("testdb"),
   ok.
-
-
-
-
-
 
 -endif.

@@ -16,7 +16,7 @@
 -author("benoitc").
 
 %% API
--export([await/1]).
+-export([await/1, await/2]).
 -export([start_link/3]).
 -export([init/4]).
 
@@ -29,7 +29,11 @@
 
 
 await(Db) ->
-  gproc:await({n, l, {?MODULE, Db}}).
+  await(Db, timer:minutes(1)).
+
+await(Db, Timeout) ->
+  gproc:await({n, l, {?MODULE, Db}}, Timeout),
+  ok.
 
 start_link(Backend, Db, Options) ->
   Parent = self(),
