@@ -120,8 +120,7 @@ is_deleted(_) -> false.
 
 winning_revision(Tree) ->
   {Winner, _WinnerExists, LeafCount, ActiveLeafCount} =
-  fold_leafs(fun(#{id := Id} = RevInfo, {W, WE, LC, ALC}) ->
-                 Deleted = is_deleted(RevInfo),
+  fold_leafs(fun(#{id := Id} = RevInfo, {W, WE, LC, ALC}) ->Deleted = is_deleted(RevInfo),
                  Exists = Deleted =:= false,
                  LC2 = LC + 1,
                  ALC2 = case Exists of

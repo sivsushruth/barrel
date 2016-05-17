@@ -18,15 +18,13 @@
 -export([set/2]).
 -export([unset/1]).
 
--export([get_db/1]).
--export([set_db/3]).
--export([delete_db/1]).
-
--export([data_dir/0]).
+-export([db_file/1]).
 -export([load_config/2]).
 
 -export([to_binary/1]).
+-export([to_list/1]).
 -export([new_id/1]).
+-export([take_last/1]).
 -export([timestamp/0]).
 -export([to_hex/1]).
 
@@ -45,26 +43,16 @@ set(Key, Val) ->
 unset(Key) ->
   ets:delete(barrel_gvar, Key).
 
-get_db(DbName) ->
-  val(DbName).
 
-set_db(DbName, Mod, Alias) ->
-  set(DbName, {Mod, Alias}).
+-spec db_file(any()) -> list().
+db_file(Name) ->
+  File = to_list(Name),
+  filelib:ensure_dir(File),
+  File.
 
-delete_db(DbName) ->
-  unset(DbName).
-
-
--spec data_dir() -> string().
-data_dir() ->
-  case application:get_env(barrel, data_dir) of
-    {ok, Dir} ->
-      Dir;
-    undefined ->
-        DefaultDir = filename:absname(lists:concat(["barrel", ".", node()])),
-        application:set_env(barrel, data_dir, DefaultDir),
-        DefaultDir
-  end.
+to_list(V) when is_atom(V) -> atom_to_list(V);
+to_list(V) when is_binary(V) -> binary_to_list(V);
+to_list(V) when is_list(V) -> V.
 
 to_binary(S) when is_list(S) ->
   list_to_binary(S);
@@ -121,6 +109,16 @@ timestamp() ->
   U = erlang:unique_integer(),
   {T, U}.
 
+
+%% @doc take the last item of a list and return a new list without it
+-spec take_last(list()) -> {term(), list()}.
+take_last([E]) ->
+  {E, []};
+take_last([E | Es]) ->
+  take_last(E, Es, [E]).
+
+take_last(_, [E], L) -> {E, lists:reverse(L)};
+take_last(_, [E|Es], L) -> take_last(E, Es, [E | L]).
 
 %% @doc convert a binary integer list to an hexadecimal
 -spec to_hex(binary()) -> binary().

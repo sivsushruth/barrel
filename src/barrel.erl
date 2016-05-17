@@ -14,22 +14,51 @@
 
 -module(barrel).
 
--export([all_databases/0, all_databases/2]).
+-export([open/2]).
+-export([close/1]).
+-export([await/1]).
 
--type db() :: atom().
--type all_databases_fun() :: fun((db(), any()) -> any()).
+open(DbName, Options) ->
+  Backend = proplists:get_value(backend, Options, barrel_rocksdb),
+  _ = code:ensure_loaded(Backend),
+  case erlang:function_exported(Backend, open, 2) of
+    false -> {error, badarg};
+    true ->
+      io:format("ici", []),
+      case barrel_dbs_sup:start_db(Backend, DbName, Options) of
+        {ok, _Pid} ->
+           {ok, gproc:where({n,l,{barrel_db,DbName}})};
+        Error ->
+          Error
+      end
+  end.
+
+close(DbName) ->
+  barrel_dbs_sup:stop_db(DbName).
+
+await(DbName) ->
+  barrel_db:await(DbName).
 
 
--export_types([db/0]).
--export_types([all_databases_fun/0]).
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+basic_test() ->
+  {ok, _} = application:ensure_all_started(barrel),
+  Db = testdb,
+  {ok, Pid} = barrel:open(Db, [{backend, barrel_rocksdb}]),
+  io:format("pid is ~p~n", [Pid]),
+  ?assert(is_pid(Pid) =:= true),
+  {Pid, {Backend, Res}} = barrel:await(Db),
+  ?assertEqual(barrel_rocksdb, Backend),
+  ?assert(filelib:is_dir("testdb") =:= true),
+  ok = barrel:close(Db),
+  barrel_os_util:rm_rf("testdb"),
+  ok.
 
 
-%% @doc list all databases
--spec all_databases() -> [barrel:db()].
-all_databases() ->
-  barrel_manager:all_databases().
 
-%% @doc fold all databases names with a function
--spec all_databases(barrel:all_databases_fun(), any()) -> any().
-all_databases(Fun, AccIn) ->
-  barrel_manager:all_databases(Fun, AccIn).
+
+
+
+-endif.

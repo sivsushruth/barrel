@@ -46,18 +46,22 @@ init([]) ->
 
   _ = init_tabs(),
 
- Manager = {barrel_manager,
-            {barrel_manager, start_link, []},
-            permanent, 5000, worker, [barrel_manager]},
+  Events = {barrel_db_events,
+            {barrel_db_events, start_link, []},
+            permanent, 5000, worker, [barrel_db_events]},
+
+  DbsSup = {barrel_dbs_sup,
+            {barrel_dbs_sup, start_link, []},
+            permanent, infinity, supervisor, [barrel_dbs_sup]},
 
   %% safe supervisor, like kernel_safe_sup but for barrel, allows to register
   %% external applications to it like stores if needed.
- ExtSup = {barrel_ext_sup,
-           {barrel_ext_sup, start_link, []},
-           permanent, infinity, supervisor, [barrel_ext_sup]},
+  ExtSup = {barrel_ext_sup,
+            {barrel_ext_sup, start_link, []},
+            permanent, infinity, supervisor, [barrel_ext_sup]},
 
 
-  {ok, { SupFlags, [Manager, ExtSup]}}.
+  {ok, { SupFlags, [Events, DbsSup, ExtSup]}}.
 
 %%====================================================================
 %% Internal functions
