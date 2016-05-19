@@ -23,12 +23,104 @@
 -module(barrel_rocksdb).
 -author("benoitc").
 
--export([open/2,
-         close/1,
-         destroy/1]).
+-export([start/2,
+         stop/1,
+         drop/1]).
+
+-export([init/3]).
+
+%% sys callback functions
+-export([system_continue/3,
+         system_terminate/4,
+         system_code_change/4]).
+
+-define(VERSION, 1).
+
+start(Db, Options) ->
+  Parent = self(),
+  proc_lib:start_link(?MODULE, init, [Parent, Db, Options], infinity).
 
 
-open(Db, Options) ->
+stop(Db) ->
+  req(Db, close).
+
+drop(Db) ->
+  req(Db, destroy).
+
+
+%% If the db process crashes we want to give the supervisor
+%% a decent chance to restart it before failing our calls.
+req(Db, Req) ->
+  req(Db, Req, 99).
+
+req(Db, Req, 0) ->
+  req1(Db, Req);
+req(Db, Req, Retries) ->
+  try
+    req1(Db, Req)
+  catch
+    exit:{db_not_loaded, _} ->
+      timer:sleep(100),
+      req(Db, Req, Retries - 1)
+  end.
+
+req1(Db, Req) ->
+  case barrel_controller:where(Db) of
+    undefined -> exit({db_not_loaded, Db});
+    Pid ->
+      Ref = make_ref(),
+      Pid ! {{self(), Ref}, Req},
+      rec(Db, Pid, Ref)
+  end.
+
+rec(Db, Pid, Ref) ->
+  receive
+    {Db, Ref, Reply} ->
+      Reply;
+    {'EXIT', Pid, _} ->
+      exit({db_not_loaded, Db})
+  end.
+
+
+
+
+init(Parent, Db, Options) ->
+  process_flag(trap_exit, true),
+  Handle = case do_open(Db, Options) of
+            {ok, H} ->
+              barrel_controller:register_db(Db, ?MODULE),
+              proc_lib:init_ack(Parent, {ok, self()}),
+              H;
+            Error ->
+              exit(Error)
+          end,
+
+  State =#{sup => Parent,
+           db => Db,
+           handle => Handle,
+           options => Options},
+
+  db_loop(State).
+
+
+db_loop(#{sup := Sup} = State) ->
+  receive
+    {From, close} ->
+      handle_close(From, State);
+    {From, destroy} ->
+      handle_destroy(From, State);
+    {system, From, Msg} ->
+      lager:debug("~p got {system, ~p, ~p}~n", [?MODULE, From, Msg]),
+      sys:handle_system_msg(Msg, From, Sup, ?MODULE, [], State);
+
+    {'EXIT', Sup, _Reason} ->
+      do_stop(State);
+    Msg ->
+      lager:info("~p got an unexpected message: ~p~n", [?MODULE, Msg]),
+      db_loop(State)
+  end.
+
+do_open(Db, Options) ->
   Name = case proplists:get_value(file, Options) of
            undefined ->
              barrel_lib:db_file(Db);
@@ -38,26 +130,55 @@ open(Db, Options) ->
            File ->
              barrel_lib:db_file(File)
          end,
+
+
   DbOpts = lists:ukeysort(1, [{create_if_missing, true} |
                               proplists:get_value(db_opts, Options, [])]),
   case erocksdb:open(Name, DbOpts) of
     {ok, Handle} ->
-      {ok, #{ name => Name,
-              handle => Handle }};
+
+      {ok, Handle};
     Error ->
       Error
   end.
 
-close(#{ handle := Handle }) ->
-  erocksdb:close(Handle).
+handle_close({Pid, Ref}, #{ db := Db , handle := Handle}) ->
+  erocksdb:close(Handle),
+  Pid ! {Db, Ref, ok},
+  ok.
 
+handle_destroy({Pid, Ref}, #{ db := Db, handle := Handle }) ->
+  erocksdb:close(Handle),
+  case erocksdb:destroy(Db, []) of
+    ok ->
+      Pid ! {Db, Ref, ok};
+    Error ->
+      Pid ! {Db, Ref, Error}
+  end,
+  ok.
 
-destroy("") ->
-  %% RAM db
-  ok;
-destroy(Name) ->
-  %% we don't use erocksdb:destroy/1 here so we can optimise the deletion
-  %% depending on the platform.
-  barrel_os_util:rm_rf(Name).
+do_stop(#{ handle := Handle}) ->
+  catch erocksdb:close(Handle),
+  exit(shutdown).
 
+%%%%%%%%%%%%%%%%%
+%% system upgrade
 
+system_continue(_Parent, _Debug, State) ->
+  db_loop(State).
+
+-spec system_terminate(_, _, _, _) -> no_return().
+system_terminate(Reason, _Parent, _Debug, State) ->
+  lager:info("~p terminate: ~p~n", [?MODULE, Reason]),
+  case Reason of
+    normal -> do_stop(State);
+    shutdown -> do_stop(State);
+    {shutdown, _} -> do_stop(State);
+    _ ->
+      #{ handle := Handle } = State,
+      catch erockdb:close(Handle),
+      exit(Reason)
+  end.
+
+system_code_change(State, _Module, _OldVsn, _Extra) ->
+  {ok, State}.

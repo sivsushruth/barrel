@@ -29,7 +29,7 @@ start_link() ->
 init([]) ->
   SupFlags =  {simple_one_for_one, 0, 10},
   Db = {barrel_db,
-        {barrel_db, start_link, []},
+        {barrel_controller, start_link, []},
         transient, 5000, worker, [barrel_db]},
 
   {ok, {SupFlags, [Db]}}.

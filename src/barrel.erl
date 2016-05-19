@@ -16,7 +16,7 @@
 
 -export([open/2]).
 -export([close/1]).
--export([await/1]).
+-export([await/1, await/2]).
 
 -type backend() :: atom().
 -type db() :: atom() | string() | binary().
@@ -33,13 +33,12 @@
 open(DbName, Options) ->
   Backend = proplists:get_value(backend, Options, barrel_rocksdb),
   _ = code:ensure_loaded(Backend),
-  case erlang:function_exported(Backend, open, 2) of
+  case erlang:function_exported(Backend, start, 2) of
     false -> {error, badarg};
     true ->
-      io:format("ici", []),
       case barrel_dbs_sup:start_db(Backend, DbName, Options) of
         {ok, _Pid} ->
-           {ok, gproc:where({n,l,{barrel_db,DbName}})};
+           {ok, barrel_controller:where(DbName)};
         Error ->
           Error
       end
@@ -54,11 +53,11 @@ close(DbName) ->
 %% @equiv await(DbName, 60000)
 -spec await(db()) -> ok.
 await(DbName) ->
-  barrel_db:await(DbName).
+  barrel_controller:await(DbName).
 
 %% @doc Waits for the barrel database `DbName' to become available.
 await(DbName, Timeout) ->
-  barrel_db:await(DbName, Timeout).
+  barrel_controller:await(DbName, Timeout).
 
 
 
@@ -67,7 +66,7 @@ await(DbName, Timeout) ->
 
 basic_test() ->
   {ok, _} = application:ensure_all_started(barrel),
-  Db = testdb,
+  Db = "testdb",
   {ok, Pid} = barrel:open(Db, [{backend, barrel_rocksdb}]),
   io:format("pid is ~p~n", [Pid]),
   ?assert(is_pid(Pid) =:= true),
